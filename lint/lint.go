@@ -1,4 +1,4 @@
-package pblint
+package lint
 
 import (
 	"fmt"

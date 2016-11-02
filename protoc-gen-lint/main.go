@@ -8,10 +8,10 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	plugin "github.com/golang/protobuf/protoc-gen-go/plugin"
-	"github.com/stackmachine/pblint"
+	"github.com/stackmachine/pb/lint"
 )
 
-func lint() error {
+func runlint() error {
 	data, err := ioutil.ReadAll(os.Stdin)
 	if err != nil {
 		return fmt.Errorf("reading input: %s", err)
@@ -31,7 +31,7 @@ func lint() error {
 	for _, name := range req.FileToGenerate {
 		for _, protoFile := range req.ProtoFile {
 			if name == *protoFile.Name {
-				problems := pblint.NewLinter(protoFile).Lint()
+				problems := lint.NewLinter(protoFile).Lint()
 				if len(problems) > 0 {
 					e := ""
 					for _, problem := range problems {
@@ -56,7 +56,7 @@ func lint() error {
 }
 
 func main() {
-	if err := lint(); err != nil {
+	if err := runlint(); err != nil {
 		log.Fatal(err)
 	}
 }
