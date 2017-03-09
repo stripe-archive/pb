@@ -6,7 +6,6 @@ import (
 	"log"
 	"os"
 
-	"github.com/golang/protobuf/jsonpb"
 	"github.com/golang/protobuf/proto"
 	plugin "github.com/golang/protobuf/protoc-gen-go/plugin"
 )
@@ -29,13 +28,13 @@ func runecho() error {
 	}
 
 	// TODO: Generate a unique name here
-	name := "codegenreq.json"
-	marsh := jsonpb.Marshaler{}
-
-	content, err := marsh.MarshalToString(&req)
-	if len(req.FileToGenerate) == 0 {
-		return fmt.Errorf("failed to serialize req: %s", err)
-	}
+	name := "codegen.req"
+	content := string(data)
+	// marsh := jsonpb.Marshaler{}
+	// content, err := marsh.MarshalToString(&req)
+	// if len(req.FileToGenerate) == 0 {
+	// 	return fmt.Errorf("failed to serialize req: %s", err)
+	// }
 
 	resp.File = []*plugin.CodeGeneratorResponse_File{
 		{
