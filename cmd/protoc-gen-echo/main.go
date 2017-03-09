@@ -6,11 +6,12 @@ import (
 	"log"
 	"os"
 
+	"github.com/golang/protobuf/jsonpb"
 	"github.com/golang/protobuf/proto"
 	plugin "github.com/golang/protobuf/protoc-gen-go/plugin"
 )
 
-func runlint() error {
+func runecho() error {
 	data, err := ioutil.ReadAll(os.Stdin)
 	if err != nil {
 		return fmt.Errorf("reading input: %s", err)
@@ -27,8 +28,14 @@ func runlint() error {
 		return fmt.Errorf("no files to generate")
 	}
 
-	name := "codegenreq.txt"
-	content := proto.MarshalTextString(&req)
+	// TODO: Generate a unique name here
+	name := "codegenreq.json"
+	marsh := jsonpb.Marshaler{}
+
+	content, err := marsh.MarshalToString(&req)
+	if len(req.FileToGenerate) == 0 {
+		return fmt.Errorf("failed to serialize req: %s", err)
+	}
 
 	resp.File = []*plugin.CodeGeneratorResponse_File{
 		{
@@ -50,7 +57,7 @@ func runlint() error {
 }
 
 func main() {
-	if err := runlint(); err != nil {
+	if err := runecho(); err != nil {
 		log.Fatal(err)
 	}
 }
