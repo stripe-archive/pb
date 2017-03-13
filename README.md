@@ -24,4 +24,4 @@ Verify protocol buffer changes are backwards compatible.
     mkdir -p head prev
     protoc --echo_out=head/ head.proto 
     protoc --echo_out=prev/ prev.proto 
-    pbdiff head/codegenreq.txt pre/codegenreq.txt
+    pbdiff head/codegen.req pre/codegen.req
