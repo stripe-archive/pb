@@ -2,6 +2,7 @@ package diff
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/golang/protobuf/protoc-gen-go/descriptor"
 	plugin "github.com/golang/protobuf/protoc-gen-go/plugin"
@@ -10,10 +11,7 @@ import (
 // Changing a protofile Name should be fine. The package name is never determined
 // by the filename.
 // Backwards incompatible changes:
-// - Removing a field
-// - Changing the type of a field
 // - Removing a RPC endpoint
-// - Removing an Enum type
 // - Changing the input or output message type
 // - Nesting / Unnesting a message or enum type
 // - Looking at options is important too
@@ -81,6 +79,18 @@ func diffFile(report *Report, previous, current *descriptor.FileDescriptorProto)
 	}
 
 	{ // Service
+		curr := map[string]*descriptor.ServiceDescriptorProto{}
+		for _, srv := range current.Service {
+			curr[*srv.Name] = srv
+		}
+		for _, srv := range previous.Service {
+			next, exists := curr[*srv.Name]
+			if !exists {
+				report.Add(ProblemRemovedService{*srv.Name})
+				continue
+			}
+			diffService(report, srv, next)
+		}
 	}
 
 	{ // MessageType
@@ -123,4 +133,48 @@ func diffMsg(report *Report, previous, current *descriptor.DescriptorProto) {
 }
 
 func diffEnum(report *Report, previous, current *descriptor.EnumDescriptorProto) {
+	curr := map[int32]*descriptor.EnumValueDescriptorProto{}
+
+	for _, value := range current.Value {
+		curr[*value.Number] = value
+	}
+
+	for _, value := range previous.Value {
+		_, exists := curr[*value.Number]
+		if !exists {
+			report.Add(ProblemRemovedEnumValue{*value.Name})
+			continue
+		}
+	}
+}
+
+// Golang go-cmp
+func diffService(report *Report, previous, current *descriptor.ServiceDescriptorProto) {
+	curr := map[string]*descriptor.MethodDescriptorProto{}
+
+	for _, value := range current.GetMethod() {
+		curr[*value.Name] = value
+	}
+
+	for _, prev := range previous.GetMethod() {
+		next, exists := curr[*prev.Name]
+		if !exists {
+			report.Add(ProblemRemovedServiceMethod{*prev.Name})
+			continue
+		}
+		if strings.Compare(*next.InputType, *prev.InputType) != 0 {
+			report.Add(ProblemChangedService{
+				Name:    *prev.Name,
+				OldType: *prev.InputType,
+				NewType: *next.InputType,
+			})
+		}
+		if strings.Compare(*next.OutputType, *prev.OutputType) != 0 {
+			report.Add(ProblemChangedService{
+				Name:    *prev.Name,
+				OldType: *prev.OutputType,
+				NewType: *next.OutputType,
+			})
+		}
+	}
 }

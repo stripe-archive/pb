@@ -14,6 +14,7 @@ import (
 // A bit of a difficult test setup, as we need to have protoc and
 // protoc-gen-echo installed
 func difftest(t *testing.T, prevproto, currproto, problem string) {
+	t.Parallel()
 	var prev, curr plugin.CodeGeneratorRequest
 	var cmd *exec.Cmd
 
@@ -82,8 +83,11 @@ func difftest(t *testing.T, prevproto, currproto, problem string) {
 	if err == nil {
 		t.Fatal("expected diff to have an error")
 	}
-	if len(report.Problems) != 1 {
-		t.Fatal("expected report to have one problem: %v", report)
+	if len(report.Problems) == 0 {
+		t.Fatal("expected report to have at least one problem")
+	}
+	if len(report.Problems) > 1 {
+		t.Errorf("expected report to have one problem, has %d: %v", len(report.Problems), report)
 	}
 	if report.Problems[0].String() != problem {
 		t.Errorf("expected problem: %s", problem)
@@ -162,5 +166,123 @@ syntax = "proto3";
 package helloworld;
 `,
 		"removed enum FOO",
+	)
+}
+
+func TestRemovedEnumField(t *testing.T) {
+	difftest(t,
+		`
+syntax = "proto3";
+package helloworld;
+enum FOO {
+  bar = 0;
+  bat = 1;
+}
+`,
+		`
+syntax = "proto3";
+package helloworld;
+enum FOO {
+  bar = 0;
+}
+`,
+		"removed enum value bat",
+	)
+}
+
+func TestRemovedService(t *testing.T) {
+	difftest(t,
+		`
+syntax = "proto3";
+package helloworld;
+service Foo {
+}
+`,
+		`
+syntax = "proto3";
+package helloworld;
+`,
+		"removed service Foo",
+	)
+}
+
+func TestRemovedServiceMethod(t *testing.T) {
+	difftest(t,
+		`
+syntax = "proto3";
+package helloworld;
+message Empty {};
+service Foo {
+  rpc Bar(Empty) returns (Empty) {}
+}
+`,
+		`
+syntax = "proto3";
+package helloworld;
+message Empty {};
+service Foo {
+}
+`,
+		"removed service method Bar",
+	)
+}
+
+func TestChangedServiceInput(t *testing.T) {
+	difftest(t,
+		`
+syntax = "proto3";
+package helloworld;
+
+message FooRequest {};
+message FooResponse {};
+message BarRequest {};
+
+service Foo {
+  rpc Invoke(FooRequest) returns (FooResponse) {}
+}
+`,
+		`
+syntax = "proto3";
+package helloworld;
+
+message FooRequest {};
+message BarRequest {};
+message FooResponse {};
+
+service Foo {
+  rpc Invoke(BarRequest) returns (FooResponse) {}
+}
+`,
+		"changed types for service Invoke: .helloworld.FooRequest -> .helloworld.BarRequest",
+	)
+}
+
+func TestChangedServiceOutput(t *testing.T) {
+	difftest(t,
+		`
+syntax = "proto3";
+package helloworld;
+
+message FooRequest {};
+message FooResponse {};
+message BarResponse {};
+
+service Foo {
+  rpc Invoke(FooRequest) returns (FooResponse) {}
+}
+`,
+		`
+syntax = "proto3";
+package helloworld;
+
+message FooRequest {};
+message FooResponse {};
+message BarResponse {};
+
+service Foo {
+  rpc Invoke(FooRequest) returns (BarResponse) {}
+}
+`,
+		"changed types for service Invoke: .helloworld.FooResponse -> .helloworld.BarResponse",
 	)
 }

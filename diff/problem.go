@@ -25,6 +25,32 @@ func (p ProblemRemovedField) String() string {
 	return fmt.Sprintf("removed field %s", p.Field)
 }
 
+type ProblemRemovedServiceMethod struct {
+	Name string
+}
+
+func (p ProblemRemovedServiceMethod) String() string {
+	return fmt.Sprintf("removed service method %s", p.Name)
+}
+
+type ProblemChangedService struct {
+	Name    string
+	OldType string
+	NewType string
+}
+
+func (p ProblemChangedService) String() string {
+	return fmt.Sprintf("changed types for service %s: %s -> %s", p.Name, p.OldType, p.NewType)
+}
+
+type ProblemRemovedEnumValue struct {
+	Name string
+}
+
+func (p ProblemRemovedEnumValue) String() string {
+	return fmt.Sprintf("removed enum value %s", p.Name)
+}
+
 type ProblemRemovedEnum struct {
 	Enum string
 }
@@ -47,4 +73,12 @@ type ProblemRemovedFile struct {
 
 func (p ProblemRemovedFile) String() string {
 	return fmt.Sprintf("removed message %s", p.File)
+}
+
+type ProblemRemovedService struct {
+	Name string
+}
+
+func (p ProblemRemovedService) String() string {
+	return fmt.Sprintf("removed service %s", p.Name)
 }
