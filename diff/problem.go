@@ -17,6 +17,16 @@ func (p ProblemChangedFieldType) String() string {
 	return fmt.Sprintf("changed types for field %s: %s -> %s", p.Field, p.OldType, p.NewType)
 }
 
+type ProblemChangedFieldLabel struct {
+	Field    string
+	OldLabel *descriptor.FieldDescriptorProto_Label
+	NewLabel *descriptor.FieldDescriptorProto_Label
+}
+
+func (p ProblemChangedFieldLabel) String() string {
+	return fmt.Sprintf("changed label for field %s: %s -> %s", p.Field, p.OldLabel, p.NewLabel)
+}
+
 type ProblemRemovedField struct {
 	Field string
 }
@@ -82,7 +92,7 @@ type ProblemRemovedFile struct {
 }
 
 func (p ProblemRemovedFile) String() string {
-	return fmt.Sprintf("removed message %s", p.File)
+	return fmt.Sprintf("removed file %s", p.File)
 }
 
 type ProblemRemovedService struct {
@@ -101,4 +111,14 @@ type ProblemChangedServiceStreaming struct {
 
 func (p ProblemChangedServiceStreaming) String() string {
 	return fmt.Sprintf("changed service streaming %s", p.Name)
+}
+
+type ProblemChangedPackage struct {
+	File   *descriptor.FileDescriptorProto
+	OldPkg string
+	NewPkg string
+}
+
+func (p ProblemChangedPackage) String() string {
+	return fmt.Sprintf("changed package from %s to %s", p.OldPkg, p.NewPkg)
 }

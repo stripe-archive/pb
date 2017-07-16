@@ -2,7 +2,6 @@ package diff
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/golang/protobuf/protoc-gen-go/descriptor"
 	plugin "github.com/golang/protobuf/protoc-gen-go/plugin"
@@ -26,6 +25,13 @@ import (
 // There are two types of changes: ones that will break existing clients, and
 // ones that will require new code changes
 
+// This package works by manually checking for differences
+// We could instead write a general comparison algorithm that diffs two golang structs
+// We chould then use the reflect package to pick which fields to compare
+// Generatelized:
+//   Operation: Added, Removed, Changed
+//   Type: MessageField, Message
+//   Ident: String (filename, message name, etc)
 type Change interface {
 	String() string
 }
@@ -64,6 +70,16 @@ func Diff(previous, current *plugin.CodeGeneratorRequest) (*Report, error) {
 }
 
 func diffFile(report *Report, previous, current *descriptor.FileDescriptorProto) {
+	{ // Name and package
+		if !cmp.Equal(previous.Package, current.Package) {
+			report.Add(ProblemChangedPackage{
+				File:   current,
+				OldPkg: *previous.Package,
+				NewPkg: *current.Package,
+			})
+		}
+	}
+
 	{ // EnumType
 		curr := map[string]*descriptor.EnumDescriptorProto{}
 		for _, enum := range current.EnumType {
@@ -123,13 +139,21 @@ func diffMsg(report *Report, previous, current *descriptor.DescriptorProto) {
 			report.Add(ProblemRemovedField{*field.Name})
 			continue
 		}
-		if *field.Type != *next.Type {
+		if !cmp.Equal(field.Type, next.Type) {
 			report.Add(ProblemChangedFieldType{
 				Field:   *field.Name,
 				OldType: field.Type,
 				NewType: next.Type,
 			})
 		}
+		if !cmp.Equal(field.Label, next.Label) {
+			report.Add(ProblemChangedFieldLabel{
+				Field:    *field.Name,
+				OldLabel: field.Label,
+				NewLabel: next.Label,
+			})
+		}
+
 	}
 }
 
@@ -176,14 +200,14 @@ func diffService(report *Report, previous, current *descriptor.ServiceDescriptor
 			report.Add(ProblemRemovedServiceMethod{*prev.Name})
 			continue
 		}
-		if strings.Compare(*next.InputType, *prev.InputType) != 0 {
+		if !cmp.Equal(next.InputType, prev.InputType) {
 			report.Add(ProblemChangedService{
 				Name:    *prev.Name,
 				OldType: *prev.InputType,
 				NewType: *next.InputType,
 			})
 		}
-		if strings.Compare(*next.OutputType, *prev.OutputType) != 0 {
+		if !cmp.Equal(next.OutputType, prev.OutputType) {
 			report.Add(ProblemChangedService{
 				Name:    *prev.Name,
 				OldType: *prev.OutputType,

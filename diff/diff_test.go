@@ -115,6 +115,26 @@ message HelloRequest {
 	)
 }
 
+func TestChangedFieldLabel(t *testing.T) {
+	difftest(t,
+		`
+syntax = "proto3";
+package helloworld;
+message HelloRequest {
+  string name = 1;
+}
+`,
+		`
+syntax = "proto3";
+package helloworld;
+message HelloRequest {
+  repeated string name = 1;
+}
+`,
+		"changed label for field name: LABEL_OPTIONAL -> LABEL_REPEATED",
+	)
+}
+
 func TestRemovedField(t *testing.T) {
 	difftest(t,
 		`
@@ -332,5 +352,19 @@ service Foo {
 }
 `,
 		"changed service streaming Invoke",
+	)
+}
+
+func TestChangedPackage(t *testing.T) {
+	difftest(t,
+		`
+syntax = "proto3";
+package foo;
+`,
+		`
+syntax = "proto3";
+package bar;
+`,
+		"changed package from foo to bar",
 	)
 }
