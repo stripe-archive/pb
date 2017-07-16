@@ -51,6 +51,16 @@ func (p ProblemRemovedEnumValue) String() string {
 	return fmt.Sprintf("removed enum value %s", p.Name)
 }
 
+type ProblemChangeEnumValue struct {
+	Name     string
+	OldValue int32
+	NewValue int32
+}
+
+func (p ProblemChangeEnumValue) String() string {
+	return fmt.Sprintf("changed enum value %s from %d to %d", p.Name, p.OldValue, p.NewValue)
+}
+
 type ProblemRemovedEnum struct {
 	Enum string
 }
@@ -81,4 +91,14 @@ type ProblemRemovedService struct {
 
 func (p ProblemRemovedService) String() string {
 	return fmt.Sprintf("removed service %s", p.Name)
+}
+
+type ProblemChangedServiceStreaming struct {
+	Name      string
+	OldStream *bool
+	NewStream *bool
+}
+
+func (p ProblemChangedServiceStreaming) String() string {
+	return fmt.Sprintf("changed service streaming %s", p.Name)
 }

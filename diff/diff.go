@@ -6,6 +6,7 @@ import (
 
 	"github.com/golang/protobuf/protoc-gen-go/descriptor"
 	plugin "github.com/golang/protobuf/protoc-gen-go/plugin"
+	"github.com/google/go-cmp/cmp"
 )
 
 // Changing a protofile Name should be fine. The package name is never determined
@@ -25,21 +26,21 @@ import (
 // There are two types of changes: ones that will break existing clients, and
 // ones that will require new code changes
 
-type Problem interface {
+type Change interface {
 	String() string
 }
 
 type Report struct {
-	Problems []Problem
+	Changes []Change
 }
 
-func (r *Report) Add(prob Problem) {
-	r.Problems = append(r.Problems, prob)
+func (r *Report) Add(ch Change) {
+	r.Changes = append(r.Changes, ch)
 }
 
 func Diff(previous, current *plugin.CodeGeneratorRequest) (*Report, error) {
 	curr := map[string]*descriptor.FileDescriptorProto{}
-	report := &Report{Problems: []Problem{}}
+	report := &Report{Changes: []Change{}}
 
 	for _, protoFile := range current.ProtoFile {
 		curr[*protoFile.Name] = protoFile
@@ -55,8 +56,8 @@ func Diff(previous, current *plugin.CodeGeneratorRequest) (*Report, error) {
 	}
 
 	var err error
-	if len(report.Problems) > 0 {
-		err = fmt.Errorf("found %d problems: %s", len(report.Problems), report.Problems)
+	if len(report.Changes) > 0 {
+		err = fmt.Errorf("found %d problems: %s", len(report.Changes), report.Changes)
 	}
 
 	return report, err
@@ -133,17 +134,30 @@ func diffMsg(report *Report, previous, current *descriptor.DescriptorProto) {
 }
 
 func diffEnum(report *Report, previous, current *descriptor.EnumDescriptorProto) {
-	curr := map[int32]*descriptor.EnumValueDescriptorProto{}
+	byvalue := map[int32]*descriptor.EnumValueDescriptorProto{}
+	byname := map[string]*descriptor.EnumValueDescriptorProto{}
 
 	for _, value := range current.Value {
-		curr[*value.Number] = value
+		byvalue[*value.Number] = value
+	}
+
+	for _, value := range current.Value {
+		byname[*value.Name] = value
 	}
 
 	for _, value := range previous.Value {
-		_, exists := curr[*value.Number]
+		_, exists := byvalue[*value.Number]
 		if !exists {
-			report.Add(ProblemRemovedEnumValue{*value.Name})
-			continue
+			next, renamed := byname[*value.Name]
+			if renamed {
+				report.Add(ProblemChangeEnumValue{
+					Name:     *value.Name,
+					OldValue: *value.Number,
+					NewValue: *next.Number,
+				})
+			} else {
+				report.Add(ProblemRemovedEnumValue{*value.Name})
+			}
 		}
 	}
 }
@@ -176,5 +190,20 @@ func diffService(report *Report, previous, current *descriptor.ServiceDescriptor
 				NewType: *next.OutputType,
 			})
 		}
+		if !cmp.Equal(prev.ClientStreaming, next.ClientStreaming) {
+			report.Add(ProblemChangedServiceStreaming{
+				Name:      *prev.Name,
+				OldStream: prev.ClientStreaming,
+				NewStream: next.ClientStreaming,
+			})
+		}
+		if !cmp.Equal(prev.ServerStreaming, next.ServerStreaming) {
+			report.Add(ProblemChangedServiceStreaming{
+				Name:      *prev.Name,
+				OldStream: prev.ServerStreaming,
+				NewStream: next.ServerStreaming,
+			})
+		}
+
 	}
 }

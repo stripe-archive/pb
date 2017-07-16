@@ -83,15 +83,15 @@ func difftest(t *testing.T, prevproto, currproto, problem string) {
 	if err == nil {
 		t.Fatal("expected diff to have an error")
 	}
-	if len(report.Problems) == 0 {
+	if len(report.Changes) == 0 {
 		t.Fatal("expected report to have at least one problem")
 	}
-	if len(report.Problems) > 1 {
-		t.Errorf("expected report to have one problem, has %d: %v", len(report.Problems), report)
+	if len(report.Changes) > 1 {
+		t.Errorf("expected report to have one problem, has %d: %v", len(report.Changes), report)
 	}
-	if report.Problems[0].String() != problem {
+	if report.Changes[0].String() != problem {
 		t.Errorf("expected problem: %s", problem)
-		t.Errorf("  actual problem: %s", report.Problems[0].String())
+		t.Errorf("  actual problem: %s", report.Changes[0].String())
 	}
 }
 
@@ -190,6 +190,28 @@ enum FOO {
 	)
 }
 
+func TestChangeEnumValue(t *testing.T) {
+	difftest(t,
+		`
+syntax = "proto3";
+package helloworld;
+enum FOO {
+  bar = 0;
+  bat = 1;
+}
+`,
+		`
+syntax = "proto3";
+package helloworld;
+enum FOO {
+  bar = 0;
+  bat = 2;
+}
+`,
+		"changed enum value bat from 1 to 2",
+	)
+}
+
 func TestRemovedService(t *testing.T) {
 	difftest(t,
 		`
@@ -284,5 +306,31 @@ service Foo {
 }
 `,
 		"changed types for service Invoke: .helloworld.FooResponse -> .helloworld.BarResponse",
+	)
+}
+
+func TestChangedClientStreaming(t *testing.T) {
+	difftest(t,
+		`
+syntax = "proto3";
+package helloworld;
+
+message Empty {};
+
+service Foo {
+  rpc Invoke(Empty) returns (Empty) {}
+}
+`,
+		`
+syntax = "proto3";
+package helloworld;
+
+message Empty {};
+
+service Foo {
+  rpc Invoke(stream Empty) returns (Empty) {}
+}
+`,
+		"changed service streaming Invoke",
 	)
 }
