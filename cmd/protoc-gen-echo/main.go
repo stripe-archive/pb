@@ -30,11 +30,6 @@ func runecho() error {
 	// TODO: Generate a unique name here
 	name := "codegen.req"
 	content := string(data)
-	// marsh := jsonpb.Marshaler{}
-	// content, err := marsh.MarshalToString(&req)
-	// if len(req.FileToGenerate) == 0 {
-	// 	return fmt.Errorf("failed to serialize req: %s", err)
-	// }
 
 	resp.File = []*plugin.CodeGeneratorResponse_File{
 		{
