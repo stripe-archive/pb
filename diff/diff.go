@@ -147,11 +147,12 @@ func diffMsg(report *Report, previous, current *descriptor.DescriptorProto) {
 	for _, field := range previous.Field {
 		next, exists := curr[*field.Number]
 		if !exists {
-			report.Add(ProblemRemovedField{*field.Name})
+			report.Add(ProblemRemovedField{*current.Name, *field.Name})
 			continue
 		}
 		if !cmp.Equal(field.Name, next.Name) {
 			report.Add(ProblemChangedFieldName{
+				Message: *current.Name,
 				Number:  *field.Number,
 				OldName: field.Name,
 				NewName: next.Name,
@@ -159,6 +160,7 @@ func diffMsg(report *Report, previous, current *descriptor.DescriptorProto) {
 		}
 		if !cmp.Equal(field.Type, next.Type) {
 			report.Add(ProblemChangedFieldType{
+				Message: *current.Name,
 				Field:   *field.Name,
 				OldType: field.Type,
 				NewType: next.Type,
@@ -166,6 +168,7 @@ func diffMsg(report *Report, previous, current *descriptor.DescriptorProto) {
 		}
 		if !cmp.Equal(field.Label, next.Label) {
 			report.Add(ProblemChangedFieldLabel{
+				Message:  *current.Name,
 				Field:    *field.Name,
 				OldLabel: field.Label,
 				NewLabel: next.Label,
@@ -193,12 +196,13 @@ func diffEnum(report *Report, previous, current *descriptor.EnumDescriptorProto)
 			next, renamed := byname[*value.Name]
 			if renamed {
 				report.Add(ProblemChangeEnumValue{
+					Enum:     *previous.Name,
 					Name:     *value.Name,
 					OldValue: *value.Number,
 					NewValue: *next.Number,
 				})
 			} else {
-				report.Add(ProblemRemovedEnumValue{*value.Name})
+				report.Add(ProblemRemovedEnumValue{*previous.Name, *value.Name})
 			}
 		}
 	}
@@ -215,11 +219,13 @@ func diffService(report *Report, previous, current *descriptor.ServiceDescriptor
 	for _, prev := range previous.GetMethod() {
 		next, exists := curr[*prev.Name]
 		if !exists {
-			report.Add(ProblemRemovedServiceMethod{*prev.Name})
+			report.Add(ProblemRemovedServiceMethod{*previous.Name, *prev.Name})
 			continue
 		}
 		if !cmp.Equal(next.InputType, prev.InputType) {
 			report.Add(ProblemChangedService{
+				Service: *current.Name,
+				Side:    "input",
 				Name:    *prev.Name,
 				OldType: *prev.InputType,
 				NewType: *next.InputType,
@@ -227,6 +233,8 @@ func diffService(report *Report, previous, current *descriptor.ServiceDescriptor
 		}
 		if !cmp.Equal(next.OutputType, prev.OutputType) {
 			report.Add(ProblemChangedService{
+				Service: *current.Name,
+				Side:    "output",
 				Name:    *prev.Name,
 				OldType: *prev.OutputType,
 				NewType: *next.OutputType,
@@ -234,14 +242,18 @@ func diffService(report *Report, previous, current *descriptor.ServiceDescriptor
 		}
 		if !cmp.Equal(prev.ClientStreaming, next.ClientStreaming) {
 			report.Add(ProblemChangedServiceStreaming{
+				Service:   *current.Name,
 				Name:      *prev.Name,
+				Side:      "client",
 				OldStream: prev.ClientStreaming,
 				NewStream: next.ClientStreaming,
 			})
 		}
 		if !cmp.Equal(prev.ServerStreaming, next.ServerStreaming) {
 			report.Add(ProblemChangedServiceStreaming{
+				Service:   *current.Name,
 				Name:      *prev.Name,
+				Side:      "server",
 				OldStream: prev.ServerStreaming,
 				NewStream: next.ServerStreaming,
 			})

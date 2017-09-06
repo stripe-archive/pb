@@ -40,20 +40,21 @@ func generateFileSet(t *testing.T, prefix, name string) descriptor.FileDescripto
 
 func TestDiffing(t *testing.T) {
 	files := map[string]string{
-		"changed_client_streaming": "changed service streaming Invoke",
-		"changed_enum_value":       "changed enum value bat from 1 to 2",
-		"changed_field_label":      "changed label for field name: LABEL_OPTIONAL -> LABEL_REPEATED",
-		"changed_field_name":       "changed name for field 1: foo -> bar",
-		"changed_field_type":       "changed types for field name: TYPE_STRING -> TYPE_BOOL",
-		"changed_package":          "changed package from foo to bar",
-		"changed_service_input":    "changed types for service Invoke: .helloworld.FooRequest -> .helloworld.BarRequest",
-		"changed_service_output":   "changed types for service Invoke: .helloworld.FooResponse -> .helloworld.BarResponse",
-		"removed_enum":             "removed enum FOO",
-		"removed_enum_field":       "removed enum value bat",
-		"removed_field":            "removed field name",
-		"removed_message":          "removed message HelloRequest",
-		"removed_service":          "removed service Foo",
-		"removed_service_method":   "removed service method Bar",
+		"changed_client_streaming": "changed client streaming for method 'Invoke' on service 'Foo': false -> true",
+		"changed_server_streaming": "changed server streaming for method 'Invoke' on service 'Foo': true -> false",
+		"changed_enum_value":       "changed value 'bat' on enum 'FOO': 1 -> 2",
+		"changed_field_label":      "changed label for field 'name' on message 'HelloRequest': LABEL_OPTIONAL -> LABEL_REPEATED",
+		"changed_field_name":       "changed name for field #1 on message 'HelloRequest': foo -> bar",
+		"changed_field_type":       "changed types for field 'name' on message 'HelloRequest': TYPE_STRING -> TYPE_BOOL",
+		"changed_package":          "changed package name: foo -> bar",
+		"changed_service_input":    "changed input type for method 'Invoke' on service 'Foo': .helloworld.FooRequest -> .helloworld.BarRequest",
+		"changed_service_output":   "changed output type for method 'Invoke' on service 'Foo': .helloworld.FooResponse -> .helloworld.BarResponse",
+		"removed_enum":             "removed enum 'FOO'",
+		"removed_enum_field":       "removed value 'bat' from enum 'FOO'",
+		"removed_field":            "removed field 'name' from message 'HelloRequest'",
+		"removed_message":          "removed message 'HelloRequest'",
+		"removed_service":          "removed service 'Foo'",
+		"removed_service_method":   "removed method 'Bar' from service 'Foo'",
 	}
 	for name, problem := range files {
 		t.Run(name, func(t *testing.T) {
