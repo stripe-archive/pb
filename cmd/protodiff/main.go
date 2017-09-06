@@ -6,155 +6,95 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
-	"os/exec"
 	"path/filepath"
 
 	"github.com/golang/protobuf/proto"
-	plugin "github.com/golang/protobuf/protoc-gen-go/plugin"
+	"github.com/golang/protobuf/protoc-gen-go/descriptor"
 	"github.com/stackmachine/pb/diff"
 )
 
-// protodiff -I . app.proto
-// Can I somehow embed protoc in protodiff? I probably shouldn't
-// Junit output maybe?
+var l *log.Logger
+
+func parseFileDescriptorSet(filename string) (*descriptor.FileDescriptorSet, error) {
+	var fds descriptor.FileDescriptorSet
+	blob, err := ioutil.ReadFile(filename)
+	if err != nil {
+		return nil, fmt.Errorf("error reading %s: %s", filename, err)
+	}
+	if err := proto.Unmarshal(blob, &fds); err != nil {
+		return nil, fmt.Errorf("error parsing FileDescriptorSet: %s", err)
+	}
+	return &fds, nil
+}
+
+func diffFiles(previous, head string) ([]filechange, error) {
+	prev, err := parseFileDescriptorSet(previous)
+	if err != nil {
+		return nil, err
+	}
+	curr, err := parseFileDescriptorSet(head)
+	if err != nil {
+		return nil, err
+	}
+	report, err := diff.DiffSet(prev, curr)
+	fc := make([]filechange, len(report.Changes))
+	for i, c := range report.Changes {
+		fc[i] = filechange{filepath.Base(previous), c}
+	}
+	return fc, err
+}
+
+type filechange struct {
+	file   string
+	change diff.Change
+}
+
+func diffDirs(previous, current string) ([]filechange, error) {
+	files, err := ioutil.ReadDir(previous)
+	if err != nil {
+		return nil, err
+	}
+	changes := []filechange{}
+	var lastErr error
+	for _, info := range files {
+		cs, err := diffFiles(filepath.Join(previous, info.Name()), filepath.Join(current, info.Name()))
+		changes = append(changes, cs...)
+		if err != nil {
+			lastErr = err
+		}
+	}
+	return changes, lastErr
+}
+
+// protoc -o old example.proto
+// protoc -o new example.proto
+// protodiff -prev old -head new
 func main() {
-	var err error
+	l = log.New(os.Stderr, "", 0)
+
+	var prevPath, headPath string
+
+	flag.StringVar(&prevPath, "prev", "", "path to previous FileDescriptorSet file or directory")
+	flag.StringVar(&headPath, "head", "", "path to current FileDescriptorSet file or directory")
 	flag.Parse()
-	// TODO: If you call protodiff -h this won't work
-	if flag.NArg() == 0 {
-		err = runecho()
+
+	var changes []filechange
+	var err error
+
+	if stat, serr := os.Stat(prevPath); serr == nil && stat.IsDir() {
+		changes, err = diffDirs(prevPath, headPath)
 	} else {
-		err = rundiff()
-	}
-	if err != nil {
-		log.Fatal(err)
-	}
-}
-
-func runecho() error {
-	data, err := ioutil.ReadAll(os.Stdin)
-	if err != nil {
-		return fmt.Errorf("reading input: %s", err)
+		changes, err = diffFiles(prevPath, headPath)
 	}
 
-	var req plugin.CodeGeneratorRequest
-	var resp plugin.CodeGeneratorResponse
-
-	if err := proto.Unmarshal(data, &req); err != nil {
-		return fmt.Errorf("parsing input proto: %s", err)
-	}
-
-	if len(req.FileToGenerate) == 0 {
-		return fmt.Errorf("no files to generate")
-	}
-
-	// TODO: Generate a unique name here
-	name := "codegen.req"
-	content := string(data)
-	// marsh := jsonpb.Marshaler{}
-	// content, err := marsh.MarshalToString(&req)
-	// if len(req.FileToGenerate) == 0 {
-	// 	return fmt.Errorf("failed to serialize req: %s", err)
-	// }
-
-	resp.File = []*plugin.CodeGeneratorResponse_File{
-		{
-			Name:    &name,
-			Content: &content,
-		},
-	}
-
-	// Send back the results.
-	data, err = proto.Marshal(&resp)
-	if err != nil {
-		return fmt.Errorf("failed to marshal output proto: %s", err)
-	}
-	_, err = os.Stdout.Write(data)
-	if err != nil {
-		return fmt.Errorf("failed to write output proto: %s", err)
-	}
-	return nil
-}
-
-func rundiff() error {
-	var prev, curr plugin.CodeGeneratorRequest
-	var cmd *exec.Cmd
-
-	// Create temporary directory
-	dir, err := ioutil.TempDir("", "protodiff")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer os.RemoveAll(dir) // clean up
-
-	execpath, err := os.Executable()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	protofile := flag.Arg(0)
-	echopath := "--plugin=protoc-gen-echo=" + execpath
-	prevdir := filepath.Join(dir, "prev")
-	prevgen := filepath.Join(prevdir, "codegen.req")
-	currdir := filepath.Join(dir, "curr")
-	currgen := filepath.Join(currdir, "codegen.req")
-
-	if err := os.Mkdir(currdir, 0755); err != nil {
-		log.Fatal(err)
-	}
-
-	if err := os.Mkdir(prevdir, 0755); err != nil {
-		log.Fatal(err)
-	}
-
-	// TODO: Read in this commit from the environment
-	startrev := "ad60c723cdd4f40a52f5e64d6d6866471b229b98"
-	cmd = exec.Command("git", "checkout", startrev)
-	if out, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("git checkout for %s failed: %s %s", startrev, err, out)
-	}
-
-	// Run protoc
-	cmd = exec.Command("protoc", echopath, "--echo_out="+prevdir, protofile)
-	if out, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("generating protoc output failed: %s %s %s", startrev, err, out)
-	}
-
-	// TODO: Read in this commit from the environment
-	endrev := "d452c6bd95548cd709ede11a52937b95c172ccaa"
-	cmd = exec.Command("git", "checkout", endrev)
-	if out, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("git checkout for %s failed: %s %s", endrev, err, out)
-	}
-
-	// Run protoc again
-	cmd = exec.Command("protoc", echopath, "--echo_out="+currdir, protofile)
-	if out, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("generating protoc output failed: %s %s %s", endrev, err, out)
-	}
-
-	preq, err := ioutil.ReadFile(prevgen)
-	if err != nil {
-		return fmt.Errorf("reading protoc err")
-	}
-	if err := proto.Unmarshal(preq, &prev); err != nil {
-		fmt.Errorf("parsing %s at revision %s failed: %s", err)
-	}
-
-	creq, err := ioutil.ReadFile(currgen)
-	if err != nil {
-		log.Fatal(err)
-	}
-	if err := proto.Unmarshal(creq, &curr); err != nil {
-		log.Fatalf("parsing curr proto: %s", err)
-	}
-
-	report, err := diff.Diff(&prev, &curr)
-	fmt.Println("Ran report...")
-	if len(report.Changes) > 0 {
-		for _, change := range report.Changes {
-			fmt.Println(change.String())
+	if len(changes) > 0 {
+		for _, fc := range changes {
+			l.Printf("%s: %s\n", fc.file, fc.change)
 		}
 		os.Exit(1)
+	}
+
+	if err != nil {
+		l.Fatal(err)
 	}
 }

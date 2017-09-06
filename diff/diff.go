@@ -69,6 +69,17 @@ func Diff(previous, current *plugin.CodeGeneratorRequest) (*Report, error) {
 	return report, err
 }
 
+func DiffSet(previous, current *descriptor.FileDescriptorSet) (*Report, error) {
+	report := &Report{Changes: []Change{}}
+	// TODO: Figure out how we want to deal with name changes
+	diffFile(report, previous.File[0], current.File[0])
+	var err error
+	if len(report.Changes) > 0 {
+		err = fmt.Errorf("found %d problems: %s", len(report.Changes), report.Changes)
+	}
+	return report, err
+}
+
 func diffFile(report *Report, previous, current *descriptor.FileDescriptorProto) {
 	{ // Name and package
 		if !cmp.Equal(previous.Package, current.Package) {
@@ -138,6 +149,13 @@ func diffMsg(report *Report, previous, current *descriptor.DescriptorProto) {
 		if !exists {
 			report.Add(ProblemRemovedField{*field.Name})
 			continue
+		}
+		if !cmp.Equal(field.Name, next.Name) {
+			report.Add(ProblemChangedFieldName{
+				Number:  *field.Number,
+				OldName: field.Name,
+				NewName: next.Name,
+			})
 		}
 		if !cmp.Equal(field.Type, next.Type) {
 			report.Add(ProblemChangedFieldType{
