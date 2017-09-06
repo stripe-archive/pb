@@ -8,8 +8,68 @@ import (
 	"testing"
 
 	"github.com/golang/protobuf/proto"
+	"github.com/golang/protobuf/protoc-gen-go/descriptor"
 	plugin "github.com/golang/protobuf/protoc-gen-go/plugin"
 )
+
+// Given a directory name and a .proto file, generate a FileDescriptorSet.
+//
+// Requires protoc to be installed.
+func generateFileSet(t *testing.T, prefix, name string) descriptor.FileDescriptorSet {
+	var fds descriptor.FileDescriptorSet
+	protoDir := filepath.Join("testdata", prefix)
+	protoFile := filepath.Join(protoDir, name+".proto")
+	fdsDir := filepath.Join("testdata", prefix+"_fds")
+	fdsFile := filepath.Join(fdsDir, name+".fds")
+	if err := os.MkdirAll(fdsDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	// Run protoc
+	cmd := exec.Command("protoc", "-o", fdsFile, protoFile)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("protoc failed: %s %s", err, out)
+	}
+	blob, err := ioutil.ReadFile(fdsFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := proto.Unmarshal(blob, &fds); err != nil {
+		t.Fatalf("parsing prev proto: %s", err)
+	}
+	return fds
+}
+
+func TestDiffing(t *testing.T) {
+	files := map[string]string{
+		"changed_field_type":  "changed types for field name: TYPE_STRING -> TYPE_BOOL",
+		"changed_field_label": "changed label for field name: LABEL_OPTIONAL -> LABEL_REPEATED",
+		"removed_field":       "removed field name",
+		"removed_message":     "removed message HelloRequest",
+		"removed_enum":        "removed enum FOO",
+		"removed_enum_field":  "removed enum value bat",
+	}
+	for name, problem := range files {
+		t.Run(name, func(t *testing.T) {
+			prev := generateFileSet(t, "previous", name)
+			curr := generateFileSet(t, "current", name)
+			// Won't work with --include_imports
+			report, err := DiffSet(&prev, &curr)
+			if err == nil {
+				t.Fatal("expected diff to have an error")
+			}
+			if len(report.Changes) == 0 {
+				t.Fatal("expected report to have at least one problem")
+			}
+			if len(report.Changes) > 1 {
+				t.Errorf("expected report to have one problem, has %d: %v", len(report.Changes), report)
+			}
+			if report.Changes[0].String() != problem {
+				t.Errorf("expected problem: %s", problem)
+				t.Errorf("  actual problem: %s", report.Changes[0].String())
+			}
+		})
+	}
+}
 
 // A bit of a difficult test setup, as we need to have protoc and
 // protoc-gen-echo installed
@@ -93,121 +153,6 @@ func difftest(t *testing.T, prevproto, currproto, problem string) {
 		t.Errorf("expected problem: %s", problem)
 		t.Errorf("  actual problem: %s", report.Changes[0].String())
 	}
-}
-
-func TestChangedFieldType(t *testing.T) {
-	difftest(t,
-		`
-syntax = "proto3";
-package helloworld;
-message HelloRequest {
-  string name = 1;
-}
-`,
-		`
-syntax = "proto3";
-package helloworld;
-message HelloRequest {
-  bool name = 1;
-}
-`,
-		"changed types for field name: TYPE_STRING -> TYPE_BOOL",
-	)
-}
-
-func TestChangedFieldLabel(t *testing.T) {
-	difftest(t,
-		`
-syntax = "proto3";
-package helloworld;
-message HelloRequest {
-  string name = 1;
-}
-`,
-		`
-syntax = "proto3";
-package helloworld;
-message HelloRequest {
-  repeated string name = 1;
-}
-`,
-		"changed label for field name: LABEL_OPTIONAL -> LABEL_REPEATED",
-	)
-}
-
-func TestRemovedField(t *testing.T) {
-	difftest(t,
-		`
-syntax = "proto3";
-package helloworld;
-message HelloRequest {
-  string name = 1;
-}
-`,
-		`
-syntax = "proto3";
-package helloworld;
-message HelloRequest {
-}
-`,
-		"removed field name",
-	)
-}
-
-func TestRemovedMessage(t *testing.T) {
-	difftest(t,
-		`
-syntax = "proto3";
-package helloworld;
-message HelloRequest {
-  string name = 1;
-}
-`,
-		`
-syntax = "proto3";
-package helloworld;
-`,
-		"removed message HelloRequest",
-	)
-}
-
-func TestRemovedEnum(t *testing.T) {
-	difftest(t,
-		`
-syntax = "proto3";
-package helloworld;
-
-enum FOO {
-  bar = 0;
-}
-`,
-		`
-syntax = "proto3";
-package helloworld;
-`,
-		"removed enum FOO",
-	)
-}
-
-func TestRemovedEnumField(t *testing.T) {
-	difftest(t,
-		`
-syntax = "proto3";
-package helloworld;
-enum FOO {
-  bar = 0;
-  bat = 1;
-}
-`,
-		`
-syntax = "proto3";
-package helloworld;
-enum FOO {
-  bar = 0;
-}
-`,
-		"removed enum value bat",
-	)
 }
 
 func TestChangeEnumValue(t *testing.T) {
