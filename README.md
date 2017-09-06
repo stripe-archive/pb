@@ -10,18 +10,17 @@
 
     protoc --lint_out=. helloworld.proto 
 
-## pbdiff
+## protodiff
 
 Verify protocol buffer changes are backwards compatible.
 
 ### Installation
 
-    go get -u github.com/stackmachine/pb/cmd/protoc-gen-echo
-    go get -u github.com/stackmachine/pb/cmd/pbdiff
+    go get -u github.com/stackmachine/pb/cmd/protodiff
 
 ### Usage
 
-    mkdir -p head prev
-    protoc --echo_out=head/ head.proto 
-    protoc --echo_out=prev/ prev.proto 
-    pbdiff head/codegen.req pre/codegen.req
+    protoc -o prev example.proto
+    # Make changes to example.proto
+    protoc -o head example.proto
+    protodiff -prev prev -head head
