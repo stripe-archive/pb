@@ -150,6 +150,13 @@ func diffMsg(report *Report, previous, current *descriptor.DescriptorProto) {
 			report.Add(ProblemRemovedField{*field.Name})
 			continue
 		}
+		if !cmp.Equal(field.Name, next.Name) {
+			report.Add(ProblemChangedFieldName{
+				Number:  *field.Number,
+				OldName: field.Name,
+				NewName: next.Name,
+			})
+		}
 		if !cmp.Equal(field.Type, next.Type) {
 			report.Add(ProblemChangedFieldType{
 				Field:   *field.Name,

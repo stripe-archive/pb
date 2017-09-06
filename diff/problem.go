@@ -17,6 +17,16 @@ func (p ProblemChangedFieldType) String() string {
 	return fmt.Sprintf("changed types for field %s: %s -> %s", p.Field, p.OldType, p.NewType)
 }
 
+type ProblemChangedFieldName struct {
+	Number  int32
+	OldName *string
+	NewName *string
+}
+
+func (p ProblemChangedFieldName) String() string {
+	return fmt.Sprintf("changed name for field %d: %s -> %s", p.Number, *p.OldName, *p.NewName)
+}
+
 type ProblemChangedFieldLabel struct {
 	Field    string
 	OldLabel *descriptor.FieldDescriptorProto_Label
